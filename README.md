@@ -13,6 +13,10 @@
 - AI 리뷰: `generated.jsonl` (GPT-4.1 mini 1,200 + Claude Haiku 4.5 1,200), `generated_clean_v2.jsonl` (Gemma3·Gemma4·Qwen3, 처음 보는 생성기 시험용)
 - 분할: 학습 8 : 평가 2, seed 42
 
+## 데이터 라이선스
+- KR3는 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) 라이선스입니다 (출처: [KR3](https://huggingface.co/datasets/leey4n/KR3)).
+- 이 저장소에 포함된 KR3 유래 데이터(`exp2` 브랜치의 `data/exp2_dataset.csv`, `viewer/reviews.json`)도 같은 조건을 따릅니다. 출처를 밝히고, 비상업적으로만 쓰고, 변형물은 같은 라이선스로 공유해야 합니다.
+
 ## 원본 데이터 준비
 원본 데이터는 저장소에 넣지 않습니다. 아래 파일을 `data_raw/` 폴더에 넣거나 `DATA_DIR` 환경변수로 폴더를 지정하세요.
 ```
