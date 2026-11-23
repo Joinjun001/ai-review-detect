@@ -1,0 +1,342 @@
+<title>리뷰 데이터 돋보기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 도구형 단일 컬럼 — 상단 탭(둘러보기 / 맞혀보기 / 흔적 비교), 그 아래 필터 줄과 리뷰 카드 격자 */
+:root {
+  --bg: #f3f5f7;
+  --surface: #ffffff;
+  --fg: #1b232c;
+  --muted: #5d6b78;
+  --line: #d9dfe5;
+  --accent: #1d5f8a;
+  --human: #1e7a5f;
+  --human-soft: #e1f1ea;
+  --ai: #a24d14;
+  --ai-soft: #f8e9dc;
+  --hl-jamo: #fde68a;
+  --hl-emoji: #fbcfe8;
+  --hl-smile: #bbf7d0;
+  --hl-ellip: #fed7aa;
+  --hl-num: #bfdbfe;
+  --hl-formal: #7c3aed;
+  --hl-yo: #0e7490;
+  --hl-trunc: #dc2626;
+  --hl-fg: #1b232c;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171c; --surface: #1a2128; --fg: #e4e9ee; --muted: #93a1ae; --line: #2c353e;
+    --accent: #6fb3e0; --human: #5cc9a3; --human-soft: #173a30; --ai: #f0a066; --ai-soft: #43281a;
+    --hl-jamo: #6b5410; --hl-emoji: #6b2550; --hl-smile: #1f5a36; --hl-ellip: #6e3c14; --hl-num: #1f4370;
+    --hl-formal: #b794f6; --hl-yo: #5fc4d8; --hl-trunc: #f87171; --hl-fg: #f2f5f7;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12171c; --surface: #1a2128; --fg: #e4e9ee; --muted: #93a1ae; --line: #2c353e;
+  --accent: #6fb3e0; --human: #5cc9a3; --human-soft: #173a30; --ai: #f0a066; --ai-soft: #43281a;
+  --hl-jamo: #6b5410; --hl-emoji: #6b2550; --hl-smile: #1f5a36; --hl-ellip: #6e3c14; --hl-num: #1f4370;
+  --hl-formal: #b794f6; --hl-yo: #5fc4d8; --hl-trunc: #f87171; --hl-fg: #f2f5f7;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+header { display: flex; flex-direction: column; gap: 6px; }
+h1 { font-size: 1.7rem; font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 68ch; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tab {
+  font: inherit; font-weight: 600; background: none; border: 0; color: var(--muted); padding: 10px 14px;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer;
+}
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab:focus-visible, button:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.panel { display: flex; flex-direction: column; gap: 18px; }
+
+.controls { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; color: var(--muted); min-width: 64px; }
+.chip {
+  font: inherit; font-size: 0.85rem; border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+  border-radius: 999px; padding: 4px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+}
+.chip[aria-pressed="true"] { border-color: var(--fg); background: var(--fg); color: var(--bg); }
+.chip .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.legend .chip[aria-pressed="false"] { opacity: 0.45; }
+.legend .chip[aria-pressed="true"] { background: var(--surface); color: var(--fg); border-color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 0.85rem; border: 0; background: var(--surface); color: var(--muted); padding: 5px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+.count { color: var(--muted); font-size: 0.85rem; }
+
+.grid { columns: 3 300px; column-gap: 14px; }
+.card {
+  break-inside: avoid; margin: 0 0 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.card.dropped .text { opacity: 0.55; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.78rem; color: var(--muted); }
+.pill { font-weight: 600; border-radius: 4px; padding: 1px 7px; font-size: 0.75rem; }
+.pill.human { background: var(--human-soft); color: var(--human); }
+.pill.ai { background: var(--ai-soft); color: var(--ai); }
+.pill.drop { background: transparent; color: var(--hl-trunc); border: 1px solid var(--hl-trunc); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.text { white-space: normal; overflow-wrap: anywhere; font-size: 0.95rem; }
+
+/* 하이라이트 */
+.h { border-radius: 3px; padding: 0 1px; color: var(--hl-fg); }
+.h-jamo { background: var(--hl-jamo); }
+.h-emoji { background: var(--hl-emoji); }
+.h-smile { background: var(--hl-smile); }
+.h-ellip { background: var(--hl-ellip); }
+.h-num { background: var(--hl-num); }
+.h-formal { color: inherit; text-decoration: underline 2px var(--hl-formal); text-underline-offset: 3px; }
+.h-yo { color: inherit; text-decoration: underline 2px var(--hl-yo); text-underline-offset: 3px; }
+.h-nl { font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 0 3px; margin: 0 2px; }
+.h-trunc { color: var(--hl-trunc); font-weight: 700; border-bottom: 2px dashed var(--hl-trunc); }
+body.off-jamo .h-jamo, body.off-emoji .h-emoji, body.off-smile .h-smile, body.off-ellip .h-ellip, body.off-num .h-num { background: none; color: inherit; }
+body.off-formal .h-formal, body.off-yo .h-yo { text-decoration: none; }
+body.off-nl .h-nl { border-color: transparent; color: var(--muted); }
+body.off-trunc .h-trunc { color: inherit; font-weight: inherit; border-bottom: 0; }
+
+/* 맞혀보기 */
+.quiz { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 18px; align-items: start; }
+@media (max-width: 760px) { .quiz { grid-template-columns: 1fr; } }
+.qcard { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.qtext { font-size: 1.15rem; line-height: 1.7; overflow-wrap: anywhere; min-height: 3.4em; }
+.qbtns { display: flex; gap: 10px; flex-wrap: wrap; }
+.big { font: inherit; font-weight: 600; font-size: 1rem; padding: 10px 22px; border-radius: 8px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.big.human { border-color: var(--human); color: var(--human); }
+.big.ai { border-color: var(--ai); color: var(--ai); }
+.big.next { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.big:disabled { opacity: 0.4; cursor: default; }
+.verdict { font-weight: 700; }
+.verdict.ok { color: var(--human); }
+.verdict.no { color: var(--hl-trunc); }
+.score { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.score .big-num { font-family: var(--font-mono); font-size: 2rem; font-weight: 500; }
+.score dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; font-size: 0.88rem; }
+.score dt { color: var(--muted); }
+.score dd { margin: 0; font-family: var(--font-mono); text-align: right; }
+.hint { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+/* 흔적 비교 */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 820px; font-size: 0.85rem; }
+th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); }
+thead th { font-weight: 600; color: var(--muted); font-size: 0.78rem; vertical-align: bottom; }
+tbody tr:last-child td { border-bottom: 0; }
+td.cell { position: relative; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td.cell .bar { position: absolute; left: 6px; bottom: 4px; height: 3px; border-radius: 2px; }
+tr.human-row td:first-child { color: var(--human); font-weight: 600; }
+tr.ai-row td:first-child { color: var(--ai); font-weight: 600; }
+.cleaned { font-size: 0.7rem; color: var(--hl-trunc); display: block; font-weight: 500; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.note { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.note h3 { margin: 0 0 6px; font-size: 0.95rem; }
+.note p { margin: 0; color: var(--muted); font-size: 0.88rem; }
+.empty { color: var(--muted); padding: 30px 0; text-align: center; }
+@media (prefers-reduced-motion: no-preference) { .qcard { transition: border-color .2s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>리뷰 데이터 돋보기</h1>
+    <p class="lede">사람 리뷰(KR3)와 AI 리뷰(GPT·Claude·Gemma·Qwen)를 나란히 놓고, 탐지 모델이 힌트로 쓸 수 있는 흔적을 색으로 표시했습니다. 정제 전과 후를 바꿔 보면 2차 실험에서 무엇이 지워졌는지 볼 수 있어요.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-browse" aria-selected="true" data-view="browse">둘러보기</button>
+    <button class="tab" role="tab" id="tab-quiz" aria-selected="false" data-view="quiz">맞혀보기</button>
+    <button class="tab" role="tab" id="tab-stats" aria-selected="false" data-view="stats">흔적 비교</button>
+  </div>
+
+  <section class="panel" id="view-browse">
+    <div class="controls">
+      <div class="row"><span class="row-label">데이터</span><div class="row" id="groups"></div></div>
+      <div class="row"><span class="row-label">버전</span>
+        <div class="seg" id="ver">
+          <button id="ver-raw" aria-pressed="true" data-v="raw">정제 전 (원본)</button>
+          <button id="ver-clean" aria-pressed="false" data-v="clean">정제 후 (2차)</button>
+        </div>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="row legend"><span class="row-label">흔적</span><div class="row" id="legend"></div></div>
+    </div>
+    <div class="grid" id="cards"><p class="empty">데이터를 불러오는 중…</p></div>
+  </section>
+
+  <section class="panel" id="view-quiz" hidden>
+    <div class="quiz">
+      <div class="qcard" id="qcard">
+        <div class="meta" id="qmeta">정제 후 텍스트입니다. 탐지 모델이 2차 실험에서 보는 것과 같아요.</div>
+        <div class="qtext" id="qtext">불러오는 중…</div>
+        <div class="qbtns">
+          <button class="big human" id="q-human">사람이 썼다</button>
+          <button class="big ai" id="q-ai">AI가 썼다</button>
+          <button class="big next" id="q-next" hidden>다음 리뷰</button>
+        </div>
+        <div id="qreveal" hidden></div>
+      </div>
+      <aside class="score">
+        <span class="count">내 정답률</span>
+        <span class="big-num" id="s-rate">–</span>
+        <dl>
+          <dt>푼 문제</dt><dd id="s-total">0</dd>
+          <dt>사람 리뷰 맞힘</dt><dd id="s-h">0 / 0</dd>
+          <dt>AI 리뷰 맞힘</dt><dd id="s-a">0 / 0</dd>
+        </dl>
+        <p class="hint">참고: 같은 데이터에서 TF-IDF 모델은 약 95%를 맞힙니다. 사람이 어려워하는 건 대개 짧은 구어체(프롬프트 C) 리뷰예요.</p>
+        <button class="chip" id="s-reset">점수 초기화</button>
+      </aside>
+    </div>
+  </section>
+
+  <section class="panel" id="view-stats" hidden>
+    <p class="lede">각 흔적이 하나라도 있는 리뷰의 비율(%)입니다. 사람 원본은 64만 건 중 5만 건 표본, 나머지는 전체 기준이에요. 빨간 표시는 2차 정제에서 지운 흔적입니다.</p>
+    <div class="table-wrap"><table id="stats"></table></div>
+    <div class="notes">
+      <div class="note"><h3>지운 것: 데이터를 모은 방식에서 생긴 흔적</h3><p>줄바꿈, 203자에서 잘린 리뷰, 외국어 리뷰는 '누가 썼나'와 상관없이 크롤링·생성 과정에서 생겼어요. 그대로 두면 모델이 내용 대신 이걸 보고 맞힙니다.</p></div>
+      <div class="note"><h3>남긴 것: 실제 문체 차이</h3><p>ㅋㅋ, 말줄임, 숫자, '-습니다' 어미는 사람과 AI가 실제로 다르게 쓰는 부분이라 지우지 않았어요. 다만 프롬프트 A만 학습하면 'ㅋ가 있으면 사람'처럼 배우는 문제가 있습니다.</p></div>
+      <div class="note"><h3>프롬프트 A와 C</h3><p>A는 조건만 주고 쓰게 한 기본형, C는 실제 리뷰 4개를 보여주고 말투를 흉내 내게 한 모방형이에요. A는 낱자·이모지가 0%이고 C는 사람과 비슷해집니다.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const GROUPS = [
+  ["human_raw", "사람 · KR3"], ["gpt_A", "GPT · A"], ["gpt_C", "GPT · C"], ["claude_A", "Claude · A"], ["claude_C", "Claude · C"],
+  ["gemma3_A", "Gemma3 · A"], ["gemma3_C", "Gemma3 · C"], ["gemma4_A", "Gemma4 · A"], ["gemma4_C", "Gemma4 · C"],
+  ["qwen3_A", "Qwen3 · A"], ["qwen3_C", "Qwen3 · C"],
+];
+const CATS = [
+  ["nl", "줄바꿈 ↵", "var(--accent)", true], ["trunc", "203자 잘림", "var(--hl-trunc)", true],
+  ["jamo", "ㅋㅎㅠ 낱자", "var(--hl-jamo)"], ["emoji", "이모지", "var(--hl-emoji)"], ["smile", "~ ^^", "var(--hl-smile)"],
+  ["ellip", "말줄임 ..", "var(--hl-ellip)"], ["num", "숫자·영문", "var(--hl-num)"],
+  ["formal", "-습니다 어미", "var(--hl-formal)"], ["yo", "-요 어미", "var(--hl-yo)"],
+];
+const state = { groups: new Set(["human_raw", "gpt_A", "gpt_C", "claude_A", "claude_C"]), ver: "raw", off: new Set() };
+try { const s = JSON.parse(localStorage.getItem("viewer-state") || "null"); if (s) { state.groups = new Set(s.groups); state.ver = s.ver; state.off = new Set(s.off); } } catch (e) {}
+const save = () => { try { localStorage.setItem("viewer-state", JSON.stringify({ groups: [...state.groups], ver: state.ver, off: [...state.off] })); } catch (e) {} };
+
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const RE = /(\r?\n)|([ㄱ-ㅎㅏ-ㅣ]+)|(\p{Extended_Pictographic}[️‍\p{Extended_Pictographic}]*)|(\^\^|~+)|(\.{2,}|…+)|(\d[\d,.]*원?|[A-Za-z]+)|((?:습니|니)다(?=[.!?~\s]|$))|(요(?=[.!?~^\s]|$))/gu;
+const KINDS = [null, "nl", "jamo", "emoji", "smile", "ellip", "num", "formal", "yo"];
+function isTrunc(s) { const t = s.replace(/\s+$/, ""); return t.endsWith("...") && t.length >= 200 && t.length <= 206; }
+function highlight(s, raw) {
+  let tail = "";
+  if (raw && isTrunc(s)) { s = s.replace(/\s+$/, "").slice(0, -3); tail = '<span class="h h-trunc" title="크롤링 미리보기에서 잘림">...✂</span>'; }
+  let out = "", last = 0;
+  for (const m of s.matchAll(RE)) {
+    out += esc(s.slice(last, m.index));
+    const k = KINDS[m.slice(1).findIndex(x => x !== undefined) + 1];
+    out += k === "nl" ? '<span class="h h-nl">↵</span><br>' : `<span class="h h-${k}">${esc(m[0])}</span>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(s.slice(last)) + tail;
+}
+
+let DATA = null;
+function renderControls() {
+  const g = document.getElementById("groups");
+  g.innerHTML = GROUPS.map(([id, label]) => `<button class="chip" id="g-${id}" aria-pressed="${state.groups.has(id)}" data-g="${id}">${label}</button>`).join("");
+  g.querySelectorAll("button").forEach(b => b.onclick = () => { const id = b.dataset.g; state.groups.has(id) ? state.groups.delete(id) : state.groups.add(id); save(); renderControls(); renderCards(); });
+  const l = document.getElementById("legend");
+  l.innerHTML = CATS.map(([id, label, col]) => `<button class="chip" id="c-${id}" aria-pressed="${!state.off.has(id)}" data-c="${id}"><span class="sw" style="background:${col}"></span>${label}</button>`).join("");
+  l.querySelectorAll("button").forEach(b => b.onclick = () => { const id = b.dataset.c; state.off.has(id) ? state.off.delete(id) : state.off.add(id); save(); renderControls(); });
+  CATS.forEach(([id]) => document.body.classList.toggle("off-" + id, state.off.has(id)));
+  document.querySelectorAll("#ver button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === state.ver));
+}
+document.querySelectorAll("#ver button").forEach(b => b.onclick = () => { state.ver = b.dataset.v; save(); renderControls(); renderCards(); });
+
+function card(r) {
+  const raw = state.ver === "raw";
+  const txt = raw ? r.raw : (r.clean ?? r.raw);
+  const len = [...txt].length;
+  const drop = !raw && r.drop;
+  return `<article class="card${drop ? " dropped" : ""}">
+    <div class="meta"><span class="pill ${r.src}">${r.src === "human" ? "사람" : "AI"}</span><span>${r.model}</span>${r.prompt !== "-" ? `<span>프롬프트 ${r.prompt}</span>` : ""}<span class="mono">${len}자</span>${r.drop ? `<span class="pill drop">${raw ? "2차에서 제거됨: " : "제거됨: "}${r.drop}</span>` : ""}</div>
+    <div class="text">${highlight(txt, raw)}</div></article>`;
+}
+function renderCards() {
+  const rows = DATA.reviews.filter(r => state.groups.has(r.g));
+  document.getElementById("count").textContent = `${rows.length}개 표시`;
+  document.getElementById("cards").innerHTML = rows.length ? rows.map(card).join("") : '<p class="empty">위에서 보고 싶은 데이터를 하나 이상 골라 주세요.</p>';
+}
+
+/* 맞혀보기 */
+const score = { h: [0, 0], a: [0, 0] };
+let cur = null, pools = null;
+function pick() {
+  const pool = Math.random() < 0.5 ? pools.h : pools.a;
+  cur = pool[Math.floor(Math.random() * pool.length)];
+  document.getElementById("qtext").textContent = cur.clean;
+  document.getElementById("qreveal").hidden = true;
+  document.getElementById("q-next").hidden = true;
+  ["q-human", "q-ai"].forEach(id => document.getElementById(id).disabled = false);
+  document.getElementById("qcard").style.borderColor = "";
+}
+function answer(guess) {
+  const truth = cur.src; const ok = guess === truth;
+  const s = truth === "human" ? score.h : score.a; s[1]++; if (ok) s[0]++;
+  ["q-human", "q-ai"].forEach(id => document.getElementById(id).disabled = true);
+  document.getElementById("q-next").hidden = false;
+  const rev = document.getElementById("qreveal");
+  rev.hidden = false;
+  rev.innerHTML = `<div class="meta"><span class="verdict ${ok ? "ok" : "no"}">${ok ? "정답" : "오답"}</span><span class="pill ${truth}">${truth === "human" ? "사람" : "AI"}</span><span>${cur.model}</span>${cur.prompt !== "-" ? `<span>프롬프트 ${cur.prompt}</span>` : ""}</div><div class="text" style="margin-top:8px">${highlight(cur.clean, false)}</div>`;
+  document.getElementById("qcard").style.borderColor = ok ? "var(--human)" : "var(--hl-trunc)";
+  renderScore();
+}
+function renderScore() {
+  const t = score.h[1] + score.a[1], c = score.h[0] + score.a[0];
+  document.getElementById("s-rate").textContent = t ? Math.round(c / t * 100) + "%" : "–";
+  document.getElementById("s-total").textContent = t;
+  document.getElementById("s-h").textContent = `${score.h[0]} / ${score.h[1]}`;
+  document.getElementById("s-a").textContent = `${score.a[0]} / ${score.a[1]}`;
+}
+document.getElementById("q-human").onclick = () => answer("human");
+document.getElementById("q-ai").onclick = () => answer("ai");
+document.getElementById("q-next").onclick = pick;
+document.getElementById("s-reset").onclick = () => { score.h = [0, 0]; score.a = [0, 0]; renderScore(); pick(); };
+
+/* 흔적 비교 */
+const SCOLS = [["nl", "줄바꿈", 1], ["trunc", "203자 잘림", 1], ["jamo", "ㅋㅎㅠ"], ["emoji", "이모지"], ["tilde", "물결 ~"], ["ellip", "말줄임"],
+  ["digit", "숫자"], ["latin", "영문"], ["formal", "끝 -습니다"], ["yo", "끝 -요"], ["period", "끝 마침표"]];
+function renderStats() {
+  const st = DATA.stats;
+  const head = `<thead><tr><th>데이터</th>${SCOLS.map(([k, l, c]) => `<th>${l}${c ? '<span class="cleaned">2차에서 제거</span>' : ""}</th>`).join("")}<th>중앙 길이</th><th>건수</th></tr></thead>`;
+  const body = Object.entries(st).map(([name, r]) => {
+    const human = name.startsWith("사람");
+    const col = human ? "var(--human)" : "var(--ai)";
+    return `<tr class="${human ? "human-row" : "ai-row"}"><td>${name}</td>${SCOLS.map(([k]) => `<td class="cell">${r[k].toFixed(1)}<span class="bar" style="width:${Math.min(r[k], 100) * 0.6}%;background:${col}"></span></td>`).join("")}<td class="cell">${r.len}자</td><td class="cell">${r.n.toLocaleString()}</td></tr>`;
+  }).join("");
+  document.getElementById("stats").innerHTML = head + "<tbody>" + body + "</tbody>";
+}
+
+/* 탭 */
+function show(view) {
+  if (!["browse", "quiz", "stats"].includes(view)) view = "browse";
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.view === view));
+  ["browse", "quiz", "stats"].forEach(v => document.getElementById("view-" + v).hidden = v !== view);
+}
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => { location.hash = t.dataset.view; show(t.dataset.view); });
+window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+show(location.hash.slice(1));
+
+renderControls();
+fetch("reviews.json").then(r => r.json()).then(d => {
+  DATA = d;
+  pools = { h: d.reviews.filter(r => r.src === "human" && r.clean), a: d.reviews.filter(r => r.src === "ai" && r.clean) };
+  renderCards(); renderStats(); pick();
+}).catch(() => { document.getElementById("cards").innerHTML = '<p class="empty">데이터 파일(reviews.json)을 불러오지 못했어요. 페이지를 새로 고쳐 주세요.</p>'; });
+</script>

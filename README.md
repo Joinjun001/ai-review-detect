@@ -64,3 +64,73 @@ python exp1_samples.py                # 그룹별 예시 출력
 | `exp1_samples.py` | 예시 출력 |
 | `results/exp1_*` | 결과 CSV와 로그 |
 | `notebooks/exp1_kaggle_notebook.ipynb` | Kaggle용 노트북 (정제 없음, 참고용). `make_exp1_notebook.py`로 생성 |
+
+---
+
+# 2차 실험 — 정제 데이터로 재평가
+
+1차에서 찾은 흔적을 **사람·AI 양쪽에 같은 규칙으로** 지운 공용 데이터셋을 만들고 다시 평가합니다.
+
+## 정제 규칙 (`exp2_clean.py`)
+| 단계 | 규칙 | 대상 | 건수 |
+|---|---|---|---|
+| 정규화 | NFC, 줄바꿈→공백, 연속 공백 1칸, zero-width·NBSP 제거, 굽은 따옴표 통일, 마크다운 `**`·목록 기호 제거, 감싼 따옴표 제거 | 공통 | 줄바꿈 27.7% → 0% |
+| F1 | 크롤링 잘림: 원문 200~206자이면서 `...`로 끝남 | 사람 | 9,730 |
+| F2·F3 | 한자·가나 포함, 한글 비율 50% 미만, 2자 미만 | 공통 | 사람 6,424 |
+| D1·D2 | 완전 중복, 준중복(한글·영숫자만 남긴 키) | 공통 | 사람 3,963 / gen1 58 / gen2 76 |
+| D3 | KR3 리뷰와 같은 AI 글 | AI | gen1 9 / gen2 15 |
+| S1 | AI 최대 길이(462자) 초과 사람 리뷰 제외, gen1 길이 분포에 맞춰 사람 5,000건 추출 | 사람 | |
+| 분할 | 8:2, seed 42, 라벨·길이 구간·생성기·프롬프트 층화 | 공통 | |
+
+## 공용 데이터셋 `data/exp2_dataset.csv`
+| 구성 | 학습 | 평가 |
+|---|---|---|
+| `set=main` 사람 | 4,000 | 1,000 |
+| `set=main` gen1 (GPT/Claude) | 1,866 | 467 |
+| `set=holdout_gen2` (Gemma3/Gemma4/Qwen3) | 2,732 | 683 |
+
+컬럼: `text, label(0 사람/1 AI), generator, prompt_type, rating, len, len_bucket, split, set`
+
+**팀원은 이 파일의 `split` 그대로 학습/평가해 주세요.** 그래야 결과를 같은 표에서 비교할 수 있습니다.
+
+## 실행
+```bash
+python exp2_clean.py   # 정제 → data/exp2_dataset.csv (이미 포함되어 있어 다시 만들 필요는 없음)
+python exp2_run.py     # 단계별 정제 효과, 시나리오 6개, 표기 제거 ablation, 길이별, 오류 예시
+```
+
+## 주요 결과 (TF-IDF, 0.5 기준)
+| 조건 | AUC | 탐지율 | 오탐률 |
+|---|---|---|---|
+| 정제 전 (S0) gen1 같은 분포 | 0.990 | 0.921 | 0.017 |
+| **정제 후** gen1 같은 분포 | 0.988 | 0.923 | 0.025 |
+| gen1 학습 → gen2 평가 | 0.957 | 0.704 | 0.025 |
+| gen1 A 학습 → C 평가 | 0.908 | 0.344 | 0.011 |
+| 20자 이하 (gen1 같은 분포) | 0.934 | 0.714 | 0.048 |
+
+- 흔적을 지워도 TF-IDF 점수는 거의 그대로다. 표면 특징 모델만 0.830 → 0.795로 떨어졌다. 높은 점수는 데이터 흔적이 아니라 **AI 문체 자체의 차이** 때문이다.
+- 약점은 일반화다. 다른 프롬프트(A→C)와 다른 생성기에서 탐지율이 크게 떨어지고, 20자 이하 리뷰도 약하다.
+- 전체 결과: `results/exp2_*`
+
+## Kaggle에서 Transformer 돌리기
+1. `data/exp2_dataset.csv`를 Kaggle Dataset으로 업로드
+2. `notebooks/exp2_kaggle_notebook.ipynb`를 Import
+3. Add Input으로 데이터셋 추가, Settings에서 GPU T4 x2, Internet On
+4. `MODEL_NAME`만 바꾸고 Run All. 시나리오 3개(같은 분포, gen1→gen2, A→C) 결과가 `exp2_results.csv`로 저장됨
+
+## 데이터 뷰어 (`viewer/`)
+사람/AI 리뷰를 나란히 보며 흔적을 색으로 표시하고, 정제 전후 비교와 맞혀보기를 할 수 있는 페이지입니다.
+```bash
+cd viewer && python -m http.server 8000   # 브라우저에서 http://localhost:8000
+```
+`index.html`을 파일로 바로 열면 `reviews.json`을 불러오지 못하니 위처럼 서버로 열어 주세요. 표본은 `python viewer/make_data.py`로 다시 만들 수 있습니다.
+
+## 파일
+| 파일 | 역할 |
+|---|---|
+| `exp2_clean.py` | 정제 규칙, 공용 데이터셋 생성 |
+| `exp2_run.py` | 2차 평가 |
+| `data/exp2_dataset.csv` | 공용 데이터셋 |
+| `results/exp2_*` | 결과 CSV와 로그 |
+| `notebooks/exp2_kaggle_notebook.ipynb` | Kaggle용 (TF-IDF + Transformer 미세조정). `make_exp2_notebook.py`로 생성 |
+| `viewer/` | 데이터 뷰어 |
