@@ -1,0 +1,11 @@
+# 원본 데이터는 저장소에 올리지 않음 (KR3는 Kaggle, 생성 리뷰는 노션에서 받기)
+data_raw/
+*.tsv
+*.parquet
+generated*.jsonl
+
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
+ckpt/
